@@ -1,57 +1,97 @@
 #!/usr/bin/env python3
 """
-Vista Verde Apartments - RMS
-Now connected to database.py
+Vista Verde Apartments - FULL RMS (Fixed & Clean)
+Owner: Ford Asuncion
 """
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
-from database import db   # <-- IMPORT DATABASE MODULE  
+import sqlite3
+
+DB_NAME = "vista_verde.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS units (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            unit_number TEXT UNIQUE NOT NULL,
+            unit_type TEXT,
+            monthly_rent REAL,
+            is_occupied INTEGER DEFAULT 0,
+            created_at TEXT
+        )
+    ''')
+    
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS tenants (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            full_name TEXT NOT NULL,
+            email TEXT,
+            phone TEXT,
+            unit_id INTEGER,
+            move_in_date TEXT,
+            monthly_rent REAL,
+            FOREIGN KEY (unit_id) REFERENCES units (id) ON DELETE SET NULL
+        )
+    ''')
+    
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS payments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id INTEGER,
+            amount REAL,
+            payment_date TEXT,
+            month_covered TEXT,
+            FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE CASCADE
+        )
+    ''')
+    
+    conn.commit()
+    conn.close()
 
 class VistaVerdeApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Vista Verde Apartments - RMS")
-        self.geometry("1400x850")
-        self.minsize(1200, 700)
+        self.geometry("1450x900")
+        self.minsize(1300, 750)
         self.configure(bg="#f0f4f8")
 
-        # User Profile Data
         self.user_data = {
-            "first_name": "Ford",
-            "last_name": "Asuncion",
-            "email": "Ford@gmail.com",
-            "phone": "09817225237",
-            "location": "Nasugbu, Batangas, Brgy 6 Phugo st.",
-            "last_seen": datetime.now().strftime("%B %d, %Y at %I:%M %p")
+            "first_name": "Ford", "last_name": "Asuncion",
+            "email": "Ford@gmail.com", "phone": "09817225237",
+            "location": "Nasugbu, Batangas, Brgy 6 Phugo st."
         }
 
+        init_db()
         self.create_sidebar()
         self.create_main_area()
         self.show_home()
 
     def create_sidebar(self):
-        sidebar = tk.Frame(self, bg="#2c3e50", width=260)
+        sidebar = tk.Frame(self, bg="#2c3e50", width=270)
         sidebar.pack(side="left", fill="y")
         sidebar.pack_propagate(False)
 
-        tk.Label(sidebar, text="Vista Verde\nApartments",
-                 font=("Helvetica", 18, "bold"), fg="white", bg="#2c3e50",
-                 justify="center").pack(pady=60)
+        tk.Label(sidebar, text="Vista Verde\nApartments", font=("Helvetica", 18, "bold"),
+                 fg="white", bg="#2c3e50", justify="center").pack(pady=70)
 
-        menu_items = [
+        menu = [
             ("Home", self.show_home),
             ("Profile", self.show_profile),
             ("Units", self.show_units),
-            ("Tenants", lambda: messagebox.showinfo("Info", "Tenants coming soon!")),
-            ("Payments", lambda: messagebox.showinfo("Info", "Payments coming soon!")),
+            ("Tenants", self.show_tenants),
+            ("Payments", self.show_payments),
             ("Logout", self.destroy)
         ]
 
-        for text, cmd in menu_items:
+        for text, cmd in menu:
             btn = tk.Button(sidebar, text=text, font=("Helvetica", 13),
                             bg="#2c3e50", fg="white", bd=0, anchor="w",
-                            padx=50, pady=20, command=cmd, cursor="hand2")
+                            padx=55, pady=22, command=cmd, cursor="hand2")
             btn.pack(fill="x")
             btn.bind("<Enter>", lambda e, b=btn: b.config(bg="#34495e"))
             btn.bind("<Leave>", lambda e, b=btn: b.config(bg="#2c3e50"))
@@ -64,6 +104,7 @@ class VistaVerdeApp(tk.Tk):
         for widget in self.main_frame.winfo_children():
             widget.destroy()
 
+    # ==================== HOME ====================
     def show_home(self):
         self.clear_main()
         canvas = tk.Canvas(self.main_frame, bg="#00a8b5", highlightthickness=0)
@@ -71,156 +112,317 @@ class VistaVerdeApp(tk.Tk):
         center = tk.Frame(canvas, bg="#00a8b5")
         center.place(relx=0.5, rely=0.5, anchor="center")
 
-        logo = tk.Canvas(center, width=330, height=330, bg="#00a8b5", highlightthickness=0)
+        logo = tk.Canvas(center, width=340, height=340, bg="#00a8b5", highlightthickness=0)
         logo.pack()
-        logo.create_oval(40, 40, 290, 290, fill="white", outline="#00d4c0")
-        logo.create_polygon(165, 70, 120, 160, 210, 160, fill="#00a8b5")
-        logo.create_polygon(165, 100, 100, 200, 230, 200, fill="#00a8b5")
+        logo.create_oval(40, 40, 300, 300, fill="white", outline="#00d4c0")
+        logo.create_polygon(170, 70, 120, 170, 220, 170, fill="#00a8b5")
+        logo.create_polygon(170, 110, 100, 220, 240, 220, fill="#00a8b5")
 
-        tk.Label(center, text="VISTAVERDE", font=("Helvetica", 40, "bold"),
-                 fg="white", bg="#00a8b5").pack(pady=25)
-        tk.Label(center, text="Apartments", font=("Helvetica", 18),
-                 fg="#b0f0ff", bg="#00a8b5").pack()
+        tk.Label(center, text="VISTAVERDE", font=("Helvetica", 42, "bold"),
+                 fg="white", bg="#00a8b5").pack(pady=30)
+        tk.Label(center, text="Apartments", font=("Helvetica", 20), fg="#b0f8ff", bg="#00a8b5").pack()
 
-    # ---------------- PROFILE --------------------
+    # ==================== PROFILE ====================
     def show_profile(self):
         self.clear_main()
         top = tk.Frame(self.main_frame, bg="#3498db", height=110)
-        top.pack(fill="x")
-        top.pack_propagate(False)
-        tk.Label(top, text=f"Welcome {self.user_data['email']}",
-                 font=("Helvetica", 20, "bold"), fg="white",
-                 bg="#3498db").pack(side="left", padx=50, pady=35)
+        top.pack(fill="x"); top.pack_propagate(False)
+        tk.Label(top, text=f"Welcome {self.user_data['email']}", font=("Helvetica", 20, "bold"),
+                 fg="white", bg="#3498db").pack(side="left", padx=50, pady=35)
 
         content = tk.Frame(self.main_frame, bg="#f0f4f8")
         content.pack(fill="both", expand=True, padx=60, pady=40)
 
-        left = tk.Frame(content, bg="white", relief="solid", bd=1, width=320)
-        left.pack(side="left", padx=(0, 50))
-        left.pack_propagate(False)
-        photo = tk.Canvas(left, width=220, height=220, bg="white", highlightthickness=0)
+        left = tk.Frame(content, bg="white", relief="solid", bd=1, width=340)
+        left.pack(side="left", padx=(0,50)); left.pack_propagate(False)
+        photo = tk.Canvas(left, width=230, height=230, bg="white", highlightthickness=0)
         photo.pack(pady=50)
-        photo.create_oval(20, 20, 200, 200, fill="#e0e0e0", outline="#aaa", width=4)
-        photo.create_text(110, 110, text="FA", font=("Helvetica", 60, "bold"), fill="#888")
-        tk.Label(left, text="Ford Asuncion", font=("Helvetica", 16, "bold"), bg="white").pack(pady=10)
-        tk.Label(left, text=f"Last Seen: {self.user_data['last_seen']}", fg="gray", bg="white").pack()
+        photo.create_oval(20,20,210,210, fill="#e0e0e0", outline="#aaa", width=4)
+        photo.create_text(115,115, text="FA", font=("Helvetica", 70, "bold"), fill="#777")
+        tk.Label(left, text="Ford Asuncion", font=("Helvetica", 18, "bold"), bg="white").pack(pady=10)
 
-    # ---------------- UNITS --------------------
+        right = tk.Frame(content, bg="white", relief="solid", bd=1)
+        right.pack(side="right", fill="both", expand=True)
+        tk.Label(right, text="My Profile", font=("Helvetica", 22, "bold"), bg="white").pack(anchor="w", padx=50, pady=35)
+
+        info = [
+            ("Name", "First Name", self.user_data["first_name"]),
+            ("Name", "Last Name", self.user_data["last_name"]),
+            ("Email", "Email", self.user_data["email"]),
+            ("Phone", "Phone", self.user_data["phone"]),
+            ("Location", "Address", self.user_data["location"]),
+        ]
+        for icon, label, value in info:
+            row = tk.Frame(right, bg="white")
+            row.pack(fill="x", padx=60, pady=15)
+            tk.Label(row, text=icon, font=("Segoe UI Emoji", 30)).pack(side="left")
+            tk.Label(row, text=f"{label}:", font=("Helvetica", 12, "bold")).pack(side="left", padx=25)
+            tk.Label(row, text=value, font=("Helvetica", 12), fg="#2c3e50").pack(side="left")
+
+    # ==================== UNITS ====================
     def show_units(self):
         self.clear_main()
-
         top = tk.Frame(self.main_frame, bg="#2c3e50")
-        top.pack(fill="x", pady=(0, 15))
-        tk.Label(top, text="Apartment Units", font=("Helvetica", 20, "bold"),
-                 fg="white", bg="#2c3e50").pack(side="left", padx=20, pady=15)
+        top.pack(fill="x", pady=(0,15))
+        tk.Label(top, text="Apartment Units", font=("Helvetica", 20, "bold"), fg="white", bg="#2c3e50")\
+                 .pack(side="left", padx=20, pady=15)
+        btns = tk.Frame(top, bg="#2c3e50")
+        btns.pack(side="right", padx=20)
+        ttk.Button(btns, text="Add Unit", command=self.add_unit).pack(side="right", padx=5)
+        ttk.Button(btns, text="Delete Unit", command=self.delete_unit).pack(side="right", padx=5)
 
-        btn_frame = tk.Frame(top, bg="#2c3e50")
-        btn_frame.pack(side="right", padx=20)
-        ttk.Button(btn_frame, text="Add Unit", command=self.add_unit).pack(side="right", padx=5)
-        ttk.Button(btn_frame, text="Delete Unit", command=self.delete_unit).pack(side="right", padx=5)
+        columns = ("id", "unit_number", "unit_type", "rent", "occupied", "created")
+        self.tree_units = ttk.Treeview(self.main_frame, columns=columns, show="headings")
+        self.tree_units.pack(fill="both", expand=True)
+        for col, text in zip(columns, ["ID", "Unit Number", "Type", "Monthly Rent", "Occupied", "Created"]):
+            self.tree_units.heading(col, text=text)
+            self.tree_units.column(col, anchor="center", width=150)
+        self.tree_units.column("id", width=70)
 
-        columns = ("id", "unit_number", "unit_type", "monthly_rent", "is_occupied", "created_at")
-        self.tree = ttk.Treeview(self.main_frame, columns=columns, show="headings", height=20)
-        self.tree.pack(fill="both", expand=True)
-
-        headings = ["Id", "Unit Number", "Unit Type", "Monthly Rent", "Is Occupied", "Created At"]
-        for col, text in zip(columns, headings):
-            self.tree.heading(col, text=text)
-            self.tree.column(col, anchor="center", width=150)
-
-        self.tree.column("id", width=60)
-        self.tree.column("is_occupied", width=100)
-
-        scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.tree.yview)
-        self.tree.configure(yscrollcommand=scrollbar.set)
+        scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.tree_units.yview)
+        self.tree_units.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
-
         self.load_units()
 
     def load_units(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
-
-        units = db.get_all_units()  # <-- LOAD FROM DATABASE MODULE
-
-        for u in units:
-            occupied = "Yes" if u["is_occupied"] else "No"
-            self.tree.insert("", "end",
-                             values=(u["id"], u["unit_number"], u["unit_type"],
-                                     f"₱{u['monthly_rent']:,.2f}", occupied, u["created_at"]))
+        for i in self.tree_units.get_children(): self.tree_units.delete(i)
+        conn = sqlite3.connect(DB_NAME)
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM units ORDER BY unit_number")
+        for row in cur.fetchall():
+            occupied = "Yes" if row[4] else "No"
+            self.tree_units.insert("", "end", values=(row[0], row[1], row[2], f"₱{row[3]:,.2f}", occupied, row[5]))
+        conn.close()
 
     def add_unit(self):
-        dialog = AddUnitDialog(self)
-        self.wait_window(dialog)
-        self.load_units()
+        AddUnitDialog(self, self.load_units)
 
     def delete_unit(self):
-        selected = self.tree.selection()
-        if not selected:
-            messagebox.showwarning("Select Unit", "Please select a unit to delete!")
-            return
+        sel = self.tree_units.selection()
+        if not sel: return messagebox.showwarning("Select", "Please select a unit")
+        unit_id = self.tree_units.item(sel[0])["values"][0]
+        if messagebox.askyesno("Delete", "Delete this unit?"):
+            conn = sqlite3.connect(DB_NAME)
+            conn.execute("DELETE FROM units WHERE id=?", (unit_id,))
+            conn.commit(); conn.close()
+            self.load_units()
 
-        unit_id = self.tree.item(selected[0])["values"][0]
+    # ==================== TENANTS ====================
+    def show_tenants(self):
+        self.clear_main()
+        top = tk.Frame(self.main_frame, bg="#2c3e50")
+        top.pack(fill="x", pady=(0,15))
+        tk.Label(top, text="Tenants", font=("Helvetica", 20, "bold"), fg="white", bg="#2c3e50")\
+                 .pack(side="left", padx=20, pady=15)
+        btns = tk.Frame(top, bg="#2c3e50")
+        btns.pack(side="right", padx=20)
+        ttk.Button(btns, text="Add Tenant", command=self.add_tenant).pack(side="right", padx=5)
+        ttk.Button(btns, text="Delete Tenant", command=self.delete_tenant).pack(side="right", padx=5)
 
-        if messagebox.askyesno("Confirm Delete", "Delete this unit permanently?"):
-            if db.delete_unit(unit_id):   # <-- DELETE USING DATABASE MODULE
-                self.load_units()
-                messagebox.showinfo("Success", "Unit deleted successfully!")
-            else:
-                messagebox.showerror("Error", "Delete failed!")
+        cols = ("id", "name", "email", "phone", "unit", "move_in", "rent")
+        self.tree_tenants = ttk.Treeview(self.main_frame, columns=cols, show="headings")
+        self.tree_tenants.pack(fill="both", expand=True)
+        headings = ["ID", "Full Name", "Email", "Phone", "Unit", "Move-In", "Rent"]
+        for c, h in zip(cols, headings):
+            self.tree_tenants.heading(c, text=h); self.tree_tenants.column(c, anchor="center", width=160)
+        self.tree_tenants.column("id", width=70)
 
-# ---------------- ADD UNIT POPUP --------------------
+        scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.tree_tenants.yview)
+        self.tree_tenants.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.load_tenants()
+
+    def load_tenants(self):
+        for i in self.tree_tenants.get_children(): self.tree_tenants.delete(i)
+        conn = sqlite3.connect(DB_NAME)
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT t.id, t.full_name, t.email, t.phone, u.unit_number, t.move_in_date, t.monthly_rent
+            FROM tenants t LEFT JOIN units u ON t.unit_id = u.id
+        ''')
+        for row in cur.fetchall():
+            unit = row[4] if row[4] else "—"
+            rent = f"₱{row[6]:,.2f}" if row[6] else "—"
+            self.tree_tenants.insert("", "end", values=(row[0], row[1], row[2] or "—", row[3] or "—", unit, row[5], rent))
+        conn.close()
+
+    def add_tenant(self):
+        AddTenantDialog(self, self.load_tenants)
+
+    def delete_tenant(self):
+        sel = self.tree_tenants.selection()
+        if not sel: return messagebox.showwarning("Select", "Please select a tenant")
+        tenant_id = self.tree_tenants.item(sel[0])["values"][0]
+        if messagebox.askyesno("Delete", "Delete this tenant and all payments?"):
+            conn = sqlite3.connect(DB_NAME)
+            conn.execute("DELETE FROM tenants WHERE id=?", (tenant_id,))
+            conn.commit(); conn.close()
+            self.load_tenants()
+
+    # ==================== PAYMENTS ====================
+    def show_payments(self):
+        self.clear_main()
+        top = tk.Frame(self.main_frame, bg="#2c3e50")
+        top.pack(fill="x", pady=(0,15))
+        tk.Label(top, text="Payments & Due Dates", font=("Helvetica", 20, "bold"), fg="white", bg="#2c3e50")\
+                 .pack(side="left", padx=20, pady=15)
+        ttk.Button(top, text="Record Payment", command=self.record_payment).pack(side="right", padx=20)
+
+        cols = ("tenant", "unit", "amount", "month", "date")
+        self.tree_payments = ttk.Treeview(self.main_frame, columns=cols, show="headings")
+        self.tree_payments.pack(fill="both", expand=True, padx=10, pady=10)
+        headings = ["Tenant", "Unit", "Amount", "Month Covered", "Paid On"]
+        for c, h in zip(cols, headings):
+            self.tree_payments.heading(c, text=h); self.tree_payments.column(c, anchor="center", width=200)
+
+        scrollbar = ttk.Scrollbar(self.main_frame, orient="vertical", command=self.tree_payments.yview)
+        self.tree_payments.configure(yscrollcommand=scrollbar.set)
+        scrollbar.pack(side="right", fill="y")
+        self.load_payments()
+
+    def load_payments(self):
+        for i in self.tree_payments.get_children(): self.tree_payments.delete(i)
+        conn = sqlite3.connect(DB_NAME)
+        cur = conn.cursor()
+        cur.execute('''
+            SELECT t.full_name, u.unit_number, p.amount, p.month_covered, p.payment_date
+            FROM payments p
+            JOIN tenants t ON p.tenant_id = t.id
+            LEFT JOIN units u ON t.unit_id = u.id
+            ORDER BY p.payment_date DESC
+        ''')
+        for row in cur.fetchall():
+            self.tree_payments.insert("", "end", values=(
+                row[0], row[1] or "—", f"₱{row[2]:,.2f}", row[3], row[4]
+            ))
+        conn.close()
+
+    def record_payment(self):
+        RecordPaymentDialog(self, self.load_payments)
+
+# ==================== DIALOGS ====================
 class AddUnitDialog(tk.Toplevel):
-    def __init__(self, parent):
+    def __init__(self, parent, callback):
         super().__init__(parent)
-        self.title("Add New Unit")
-        self.geometry("400x500")
-        self.configure(bg="#f0f4f8")
-        self.resizable(False, False)
-        self.grab_set()
-
-        tk.Label(self, text="Add New Apartment Unit", font=("Helvetica", 16, "bold"), bg="#f0f4f8").pack(pady=20)
-
-        form = tk.Frame(self, bg="#f0f4f8")
-        form.pack(pady=20, padx=40)
-
-        labels = ["Unit Number (e.g. 101)", "Unit Type (e.g. Studio, 1BR)", "Monthly Rent (₱)"]
+        self.title("Add Unit"); self.geometry("400x400"); self.resizable(False, False); self.grab_set()
+        self.callback = callback
+        tk.Label(self, text="Add New Unit", font=("Helvetica", 16, "bold")).pack(pady=20)
+        fields = ["Unit Number (e.g. 101)", "Unit Type", "Monthly Rent (₱)"]
         self.entries = {}
-        for label in labels:
-            tk.Label(form, text=label + ":", bg="#f0f4f8", font=("Helvetica", 11)).pack(anchor="w", pady=8)
-            entry = tk.Entry(form, font=("Helvetica", 11), width=30)
-            entry.pack(pady=5)
-            self.entries[label] = entry
+        for f in fields:
+            tk.Label(self, text=f + ":").pack(anchor="w", padx=50, pady=8)
+            e = tk.Entry(self, width=30); e.pack(pady=5, padx=50); self.entries[f] = e
+        btns = tk.Frame(self); btns.pack(pady=30)
+        ttk.Button(btns, text="Add", command=self.save).pack(side="left", padx=10)
+        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=10)
 
-        btn_frame = tk.Frame(self, bg="#f0f4f8")
-        btn_frame.pack(pady=30)
-        ttk.Button(btn_frame, text="Add Unit", command=self.save_unit).pack(side="left", padx=10)
-        ttk.Button(btn_frame, text="Cancel", command=self.destroy).pack(side="left", padx=10)
-
-    def save_unit(self):
-        unit_num = self.entries["Unit Number (e.g. 101)"].get().strip()
-        unit_type = self.entries["Unit Type (e.g. Studio, 1BR)"].get().strip()
-        rent_raw = self.entries["Monthly Rent (₱)"].get().strip()
-
+    def save(self):
+        num = self.entries["Unit Number (e.g. 101)"].get().strip()
+        typ = self.entries["Unit Type"].get().strip()
+        try: rent = float(self.entries["Monthly Rent (₱)"].get())
+        except: return messagebox.showerror("Error", "Rent must be a number")
+        if not num or not typ: return messagebox.showerror("Error", "All fields required")
+        conn = sqlite3.connect(DB_NAME)
         try:
-            rent = float(rent_raw)
-        except:
-            messagebox.showerror("Invalid", "Monthly rent must be a number!")
-            return
+            conn.execute("INSERT INTO units (unit_number, unit_type, monthly_rent, created_at) VALUES (?, ?, ?, ?)",
+                        (num, typ, rent, datetime.now().strftime("%Y-%m-%d")))
+            conn.commit()
+            messagebox.showinfo("Success", f"Unit {num} added!")
+            self.callback(); self.destroy()
+        except sqlite3.IntegrityError:
+            messagebox.showerror("Error", "Unit number already exists")
+        finally: conn.close()
 
-        if not unit_num or not unit_type:
-            messagebox.showerror("Error", "All fields are required!")
-            return
+class AddTenantDialog(tk.Toplevel):
+    def __init__(self, parent, callback):
+        super().__init__(parent)
+        self.title("Add Tenant"); self.geometry("500x600"); self.grab_set()
+        self.callbacklarından = callback
+        tk.Label(self, text="Add New Tenant", font=("Helvetica", 16, "bold")).pack(pady=20)
 
-        ok = db.add_unit(unit_num, unit_type, rent)
+        self.entries = {}
+        labels = ["Full Name", "Email", "Phone", "Move-In Date (YYYY-MM-DD)"]
+        for l in labels:
+            tk.Label(self, text=l + ":").pack(anchor="w", padx=60, pady=8)
+            e = tk.Entry(self, width=40); e.pack(pady=5); self.entries[l] = e
 
-        if ok:
-            messagebox.showinfo("Success", f"Unit {unit_num} added successfully!")
-            self.destroy()
-        else:
-            messagebox.showerror("Error", "Unit number already exists!")
+        tk.Label(self, text="Assign to Unit:").pack(anchor="w", padx=60, pady=(20,5))
+        self.unit_var = tk.StringVar()
+        combo = ttk.Combobox(self, textvariable=self.unit_var, state="readonly", width=37)
+        combo.pack(pady=5, padx=60)
+        conn = sqlite3.connect(DB_NAME)
+        units = conn.execute("SELECT id, unit_number FROM units WHERE is_occupied = 0").fetchall()
+        combo['values'] = [f"{u[1]} (Available)" for u in units]
+        self.unit_ids = {f"{u[1]} (Available)": u[0] for u in units}
+        conn.close()
 
-# Run App
+        btns = tk.Frame(self); btns.pack(pady=30)
+        ttk.Button(btns, text="Add Tenant", command=self.save).pack(side="left", padx=10)
+        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=10)
+
+    def save(self):
+        name = self.entries["Full Name"].get().strip()
+        email = self.entries["Email"].get().strip()
+        phone = self.entries["Phone"].get().strip()
+        date_in = self.entries["Move-In Date (YYYY-MM-DD)"].get().strip()
+        unit_text = self.unit_var.get()
+        if not name or not date_in: return messagebox.showerror("Error", "Name and Move-In Date required")
+
+        unit_id = self.unit_ids.get(unit_text)
+        conn = sqlite3.connect(DB_NAME)
+        rent = conn.execute("SELECT monthly_rent FROM units WHERE id=?", (unit_id,)).fetchone()[0] if unit_id else 0
+        conn.execute("INSERT INTO tenants (full_name, email, phone, unit_id, move_in_date, monthly_rent) VALUES (?, ?, ?, ?, ?, ?)",
+                    (name, email or None, phone or None, unit_id, date_in, rent))
+        if unit_id:
+            conn.execute("UPDATE units SET is_occupied = 1 WHERE id=?", (unit_id,))
+        conn.commit(); conn.close()
+        messagebox.showinfo("Success", f"Tenant {name} added!")
+        self.callback(); self.destroy()
+
+class RecordPaymentDialog(tk.Toplevel):
+    def __init__(self, parent, callback):
+        super().__init__(parent)
+        self.title("Record Payment"); self.geometry("450x400"); self.grab_set()
+        self.callback = callback
+        tk.Label(self, text="Record Payment", font=("Helvetica", 16, "bold")).pack(pady=20)
+
+        tk.Label(self, text="Select Tenant:").pack(anchor="w", padx=60, pady=(10,5))
+        self.tenant_var = tk.StringVar()
+        combo = ttk.Combobox(self, textvariable=self.tenant_var, state="readonly", width=40)
+        combo.pack(pady=5, padx=60)
+        conn = sqlite3.connect(DB_NAME)
+        tenants = conn.execute("SELECT id, full_name FROM tenants").fetchall()
+        combo['values'] = [t[1] for t in tenants]
+        self.tenant_ids = {t[1]: t[0] for t in tenants}
+        conn.close()
+
+        tk.Label(self, text="Amount Paid (₱):").pack(anchor="w", padx=60, pady=(15,5))
+        self.amount_entry = tk.Entry(self, width=30); self.amount_entry.pack(pady=5)
+
+        tk.Label(self, text="Month Covered (e.g. 2025-12):").pack(anchor="w", padx=60, pady=(15,5))
+        self.month_entry = tk.Entry(self, width=30); self.month_entry.pack(pady=5)
+        self.month_entry.insert(0, datetime.now().strftime("%Y-%m"))
+
+        btns = tk.Frame(self); btns.pack(pady=30)
+        ttk.Button(btns, text="Record Payment", command=self.save).pack(side="left", padx=10)
+        ttk.Button(btns, text="Cancel", command=self.destroy).pack(side="left", padx=10)
+
+    def save(self):
+        tenant_name = self.tenant_var.get()
+        try: amount = float(self.amount_entry.get())
+        except: return messagebox.showerror("Error", "Invalid amount")
+        month = self.month_entry.get().strip()
+        if not tenant_name or not month: return messagebox.showerror("Error", "All fields required")
+
+        tenant_id = self.tenant_ids[tenant_name]
+        conn = sqlite3.connect(DB_NAME)
+        conn.execute("INSERT INTO payments (tenant_id, amount, payment_date, month_covered) VALUES (?, ?, ?, ?)",
+                    (tenant_id, amount, datetime.now().strftime("%Y-%m-%d"), month))
+        conn.commit(); conn.close()
+        messagebox.showinfo("Success", f"Payment of ₱{amount:,.2f} recorded!")
+        self.callback(); self.destroy()
+
+# ==================== RUN ====================
 if __name__ == "__main__":
     app = VistaVerdeApp()
     app.mainloop()
