@@ -2,55 +2,78 @@
 """
 Vista Verde Apartments - FULL RMS (Fixed & Clean)
 Owner: Ford Asuncion
+
+This application connects to the database created by database.py
+Run database.py first to set up the database!
 """
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
 import sqlite3
+import os
 
-DB_NAME = "vista_verde.db"
+# Import database functions
+try:
+    from database import create_database, insert_sample_data, DB_NAME
+    HAS_DATABASE_MODULE = True
+except ImportError:
+    HAS_DATABASE_MODULE = False
+    DB_NAME = "vista_verde.db"
 
 def init_db():
-    conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS units (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            unit_number TEXT UNIQUE NOT NULL,
-            unit_type TEXT,
-            monthly_rent REAL,
-            is_occupied INTEGER DEFAULT 0,
-            created_at TEXT
-        )
-    ''')
-    
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS tenants (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            full_name TEXT NOT NULL,
-            email TEXT,
-            phone TEXT,
-            unit_id INTEGER,
-            move_in_date TEXT,
-            monthly_rent REAL,
-            FOREIGN KEY (unit_id) REFERENCES units (id) ON DELETE SET NULL
-        )
-    ''')
-    
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS payments (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            tenant_id INTEGER,
-            amount REAL,
-            payment_date TEXT,
-            month_covered TEXT,
-            FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE CASCADE
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
+    """Initialize database - use database.py functions if available"""
+    if not os.path.exists(DB_NAME):
+        if HAS_DATABASE_MODULE:
+            print("📦 Database not found. Creating from database.py...")
+            conn, cur = create_database()
+            if conn and cur:
+                insert_sample_data(conn, cur)
+                conn.close()
+                print("✅ Database created successfully!")
+        else:
+            print("⚠️ Warning: database.py not found. Creating basic structure...")
+            conn = sqlite3.connect(DB_NAME)
+            cur = conn.cursor()
+            
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS units (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    unit_number TEXT UNIQUE NOT NULL,
+                    unit_type TEXT,
+                    monthly_rent REAL,
+                    is_occupied INTEGER DEFAULT 0,
+                    created_at TEXT
+                )
+            ''')
+            
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS tenants (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    full_name TEXT NOT NULL,
+                    email TEXT,
+                    phone TEXT,
+                    unit_id INTEGER,
+                    move_in_date TEXT,
+                    monthly_rent REAL,
+                    FOREIGN KEY (unit_id) REFERENCES units (id) ON DELETE SET NULL
+                )
+            ''')
+            
+            cur.execute('''
+                CREATE TABLE IF NOT EXISTS payments (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id INTEGER,
+                    amount REAL,
+                    payment_date TEXT,
+                    month_covered TEXT,
+                    FOREIGN KEY (tenant_id) REFERENCES tenants (id) ON DELETE CASCADE
+                )
+            ''')
+            
+            conn.commit()
+            conn.close()
+            print("✅ Basic database structure created.")
+            print("💡 Run 'python database.py' for sample data and triggers!")
 
 class VistaVerdeApp(tk.Tk):
     def __init__(self):
@@ -66,10 +89,46 @@ class VistaVerdeApp(tk.Tk):
             "location": "Nasugbu, Batangas, Brgy 6 Phugo st."
         }
 
+        # Initialize database
         init_db()
+        
+        # Check database connection
+        self.check_database_status()
+        
         self.create_sidebar()
         self.create_main_area()
         self.show_home()
+
+    def check_database_status(self):
+        """Check if database has data and show status"""
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            cur = conn.cursor()
+            
+            cur.execute("SELECT COUNT(*) FROM units")
+            unit_count = cur.fetchone()[0]
+            
+            cur.execute("SELECT COUNT(*) FROM tenants")
+            tenant_count = cur.fetchone()[0]
+            
+            cur.execute("SELECT COUNT(*) FROM payments")
+            payment_count = cur.fetchone()[0]
+            
+            conn.close()
+            
+            print(f"\n{'='*50}")
+            print(f"📊 Vista Verde Database Status")
+            print(f"{'='*50}")
+            print(f"🏢 Units: {unit_count}")
+            print(f"👥 Tenants: {tenant_count}")
+            print(f"💰 Payments: {payment_count}")
+            print(f"{'='*50}\n")
+            
+            if unit_count == 0:
+                print("💡 Tip: Run 'python database.py' to add sample data!")
+                
+        except sqlite3.Error as e:
+            print(f"⚠️ Database check warning: {e}")
 
     def create_sidebar(self):
         sidebar = tk.Frame(self, bg="#2c3e50", width=270)
@@ -121,6 +180,47 @@ class VistaVerdeApp(tk.Tk):
         tk.Label(center, text="VISTAVERDE", font=("Helvetica", 42, "bold"),
                  fg="white", bg="#00a8b5").pack(pady=30)
         tk.Label(center, text="Apartments", font=("Helvetica", 20), fg="#b0f8ff", bg="#00a8b5").pack()
+        
+        # Add database status indicator
+        self.show_database_info(center)
+
+    def show_database_info(self, parent):
+        """Show database statistics on home screen"""
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            cur = conn.cursor()
+            
+            cur.execute("SELECT COUNT(*) FROM units WHERE is_occupied = 0")
+            available = cur.fetchone()[0]
+            
+            cur.execute("SELECT COUNT(*) FROM units WHERE is_occupied = 1")
+            occupied = cur.fetchone()[0]
+            
+            cur.execute("SELECT COUNT(*) FROM tenants")
+            tenants = cur.fetchone()[0]
+            
+            conn.close()
+            
+            # Stats frame
+            stats_frame = tk.Frame(parent, bg="#00a8b5")
+            stats_frame.pack(pady=30)
+            
+            stats = [
+                ("🏢", f"{available} Available Units"),
+                ("🔑", f"{occupied} Occupied Units"),
+                ("👥", f"{tenants} Active Tenants")
+            ]
+            
+            for emoji, text in stats:
+                stat_row = tk.Frame(stats_frame, bg="#00a8b5")
+                stat_row.pack(pady=5)
+                tk.Label(stat_row, text=emoji, font=("Segoe UI Emoji", 20), 
+                        bg="#00a8b5").pack(side="left", padx=10)
+                tk.Label(stat_row, text=text, font=("Helvetica", 14), 
+                        fg="white", bg="#00a8b5").pack(side="left")
+                
+        except sqlite3.Error as e:
+            print(f"Error loading stats: {e}")
 
     # ==================== PROFILE ====================
     def show_profile(self):
@@ -337,7 +437,7 @@ class AddTenantDialog(tk.Toplevel):
     def __init__(self, parent, callback):
         super().__init__(parent)
         self.title("Add Tenant"); self.geometry("500x600"); self.grab_set()
-        self.callbacklarından = callback
+        self.callback = callback
         tk.Label(self, text="Add New Tenant", font=("Helvetica", 16, "bold")).pack(pady=20)
 
         self.entries = {}
@@ -424,5 +524,8 @@ class RecordPaymentDialog(tk.Toplevel):
 
 # ==================== RUN ====================
 if __name__ == "__main__":
+    print("\n" + "="*50)
+    print("🏢 Vista Verde Apartments RMS")
+    print("="*50)
     app = VistaVerdeApp()
     app.mainloop()
