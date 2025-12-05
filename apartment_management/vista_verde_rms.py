@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Vista Verde Apartments - FULL RMS (Fixed & Clean)
+Vista Verde Apartments - RMS with Payment Analytics
 Owner: Ford Asuncion
 
 This application connects to the database created by database.py
@@ -140,7 +140,7 @@ class VistaVerdeApp(tk.Tk):
 
         menu = [
             ("Home", self.show_home),
-            ("Profile", self.show_profile),
+            ("Analytics", self.show_analytics),
             ("Units", self.show_units),
             ("Tenants", self.show_tenants),
             ("Payments", self.show_payments),
@@ -222,42 +222,307 @@ class VistaVerdeApp(tk.Tk):
         except sqlite3.Error as e:
             print(f"Error loading stats: {e}")
 
-    # ==================== PROFILE ====================
-    def show_profile(self):
+    # ==================== ANALYTICS ====================
+    def show_analytics(self):
         self.clear_main()
+        
+        # Header
         top = tk.Frame(self.main_frame, bg="#3498db", height=110)
-        top.pack(fill="x"); top.pack_propagate(False)
-        tk.Label(top, text=f"Welcome {self.user_data['email']}", font=("Helvetica", 20, "bold"),
+        top.pack(fill="x")
+        top.pack_propagate(False)
+        tk.Label(top, text="Payment Analytics & Reports", font=("Helvetica", 20, "bold"),
                  fg="white", bg="#3498db").pack(side="left", padx=50, pady=35)
 
-        content = tk.Frame(self.main_frame, bg="#f0f4f8")
-        content.pack(fill="both", expand=True, padx=60, pady=40)
+        # Content area with scrollbar
+        content_wrapper = tk.Frame(self.main_frame, bg="#f0f4f8")
+        content_wrapper.pack(fill="both", expand=True)
+        
+        canvas = tk.Canvas(content_wrapper, bg="#f0f4f8", highlightthickness=0)
+        scrollbar = ttk.Scrollbar(content_wrapper, orient="vertical", command=canvas.yview)
+        scrollable_frame = tk.Frame(canvas, bg="#f0f4f8")
+        
+        scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        canvas.pack(side="left", fill="both", expand=True, padx=40, pady=30)
+        scrollbar.pack(side="right", fill="y")
 
-        left = tk.Frame(content, bg="white", relief="solid", bd=1, width=340)
-        left.pack(side="left", padx=(0,50)); left.pack_propagate(False)
-        photo = tk.Canvas(left, width=230, height=230, bg="white", highlightthickness=0)
-        photo.pack(pady=50)
-        photo.create_oval(20,20,210,210, fill="#e0e0e0", outline="#aaa", width=4)
-        photo.create_text(115,115, text="FA", font=("Helvetica", 70, "bold"), fill="#777")
-        tk.Label(left, text="Ford Asuncion", font=("Helvetica", 18, "bold"), bg="white").pack(pady=10)
+        # Stats summary at top
+        stats_frame = tk.Frame(scrollable_frame, bg="white", relief="solid", bd=1)
+        stats_frame.pack(fill="x", pady=(0, 20))
+        
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            cur = conn.cursor()
+            
+            # Get total payments
+            cur.execute("SELECT COALESCE(SUM(amount), 0) FROM payments")
+            total_payments = cur.fetchone()[0]
+            
+            # Get this month's payments
+            current_month = datetime.now().strftime("%Y-%m")
+            cur.execute("SELECT COALESCE(SUM(amount), 0) FROM payments WHERE month_covered = ?", (current_month,))
+            month_payments = cur.fetchone()[0]
+            
+            # Get payment count
+            cur.execute("SELECT COUNT(*) FROM payments")
+            payment_count = cur.fetchone()[0]
+            
+            # Get average payment
+            cur.execute("SELECT COALESCE(AVG(amount), 0) FROM payments")
+            avg_payment = cur.fetchone()[0]
+            
+            # Get occupied units revenue
+            cur.execute("SELECT COALESCE(SUM(monthly_rent), 0) FROM units WHERE is_occupied = 1")
+            expected_monthly = cur.fetchone()[0]
+            
+            conn.close()
+            
+            # Display stats
+            tk.Label(stats_frame, text="Payment Summary Dashboard", font=("Helvetica", 16, "bold"),
+                    bg="white").pack(pady=15)
+            
+            # First row of stats
+            stats_row1 = tk.Frame(stats_frame, bg="white")
+            stats_row1.pack(pady=10, padx=40)
+            
+            # Total
+            total_box = tk.Frame(stats_row1, bg="#e8f5e9", relief="solid", bd=2)
+            total_box.pack(side="left", padx=15, pady=10, ipadx=25, ipady=15)
+            tk.Label(total_box, text="💰 Total Collected", font=("Helvetica", 11, "bold"), 
+                    bg="#e8f5e9").pack()
+            tk.Label(total_box, text=f"₱{total_payments:,.2f}", font=("Helvetica", 20, "bold"),
+                    fg="#2e7d32", bg="#e8f5e9").pack(pady=5)
+            
+            # This month
+            month_box = tk.Frame(stats_row1, bg="#e3f2fd", relief="solid", bd=2)
+            month_box.pack(side="left", padx=15, pady=10, ipadx=25, ipady=15)
+            tk.Label(month_box, text="📅 This Month", font=("Helvetica", 11, "bold"),
+                    bg="#e3f2fd").pack()
+            tk.Label(month_box, text=f"₱{month_payments:,.2f}", font=("Helvetica", 20, "bold"),
+                    fg="#1565c0", bg="#e3f2fd").pack(pady=5)
+            
+            # Count
+            count_box = tk.Frame(stats_row1, bg="#fff3e0", relief="solid", bd=2)
+            count_box.pack(side="left", padx=15, pady=10, ipadx=25, ipady=15)
+            tk.Label(count_box, text="📊 Total Payments", font=("Helvetica", 11, "bold"),
+                    bg="#fff3e0").pack()
+            tk.Label(count_box, text=str(payment_count), font=("Helvetica", 20, "bold"),
+                    fg="#e65100", bg="#fff3e0").pack(pady=5)
+            
+            # Second row of stats
+            stats_row2 = tk.Frame(stats_frame, bg="white")
+            stats_row2.pack(pady=(0, 15), padx=40)
+            
+            # Average payment
+            avg_box = tk.Frame(stats_row2, bg="#f3e5f5", relief="solid", bd=2)
+            avg_box.pack(side="left", padx=15, pady=10, ipadx=25, ipady=15)
+            tk.Label(avg_box, text="📈 Average Payment", font=("Helvetica", 11, "bold"),
+                    bg="#f3e5f5").pack()
+            tk.Label(avg_box, text=f"₱{avg_payment:,.2f}", font=("Helvetica", 20, "bold"),
+                    fg="#6a1b9a", bg="#f3e5f5").pack(pady=5)
+            
+            # Expected monthly
+            exp_box = tk.Frame(stats_row2, bg="#fce4ec", relief="solid", bd=2)
+            exp_box.pack(side="left", padx=15, pady=10, ipadx=25, ipady=15)
+            tk.Label(exp_box, text="🎯 Expected Monthly", font=("Helvetica", 11, "bold"),
+                    bg="#fce4ec").pack()
+            tk.Label(exp_box, text=f"₱{expected_monthly:,.2f}", font=("Helvetica", 20, "bold"),
+                    fg="#c2185b", bg="#fce4ec").pack(pady=5)
+            
+            # Collection rate
+            collection_rate = (month_payments / expected_monthly * 100) if expected_monthly > 0 else 0
+            rate_box = tk.Frame(stats_row2, bg="#e0f2f1", relief="solid", bd=2)
+            rate_box.pack(side="left", padx=15, pady=10, ipadx=25, ipady=15)
+            tk.Label(rate_box, text="✅ Collection Rate", font=("Helvetica", 11, "bold"),
+                    bg="#e0f2f1").pack()
+            tk.Label(rate_box, text=f"{collection_rate:.1f}%", font=("Helvetica", 20, "bold"),
+                    fg="#00695c", bg="#e0f2f1").pack(pady=5)
+            
+        except sqlite3.Error as e:
+            print(f"Error loading stats: {e}")
 
-        right = tk.Frame(content, bg="white", relief="solid", bd=1)
-        right.pack(side="right", fill="both", expand=True)
-        tk.Label(right, text="My Profile", font=("Helvetica", 22, "bold"), bg="white").pack(anchor="w", padx=50, pady=35)
+        # Monthly trend graph
+        graph_frame = tk.Frame(scrollable_frame, bg="white", relief="solid", bd=1)
+        graph_frame.pack(fill="x", pady=(0, 20))
+        
+        tk.Label(graph_frame, text="Monthly Revenue Trend", font=("Helvetica", 14, "bold"),
+                bg="white").pack(pady=15)
+        
+        canvas_frame = tk.Frame(graph_frame, bg="white", height=400)
+        canvas_frame.pack(fill="both", padx=30, pady=(0, 30))
+        canvas_frame.pack_propagate(False)
+        
+        self.draw_monthly_trend(canvas_frame)
+        
+        # Recent payments table
+        self.show_recent_payments(scrollable_frame)
 
-        info = [
-            ("Name", "First Name", self.user_data["first_name"]),
-            ("Name", "Last Name", self.user_data["last_name"]),
-            ("Email", "Email", self.user_data["email"]),
-            ("Phone", "Phone", self.user_data["phone"]),
-            ("Location", "Address", self.user_data["location"]),
-        ]
-        for icon, label, value in info:
-            row = tk.Frame(right, bg="white")
-            row.pack(fill="x", padx=60, pady=15)
-            tk.Label(row, text=icon, font=("Segoe UI Emoji", 30)).pack(side="left")
-            tk.Label(row, text=f"{label}:", font=("Helvetica", 12, "bold")).pack(side="left", padx=25)
-            tk.Label(row, text=value, font=("Helvetica", 12), fg="#2c3e50").pack(side="left")
+    def draw_monthly_trend(self, parent):
+        """Draw monthly revenue trend graph"""
+        graph_canvas = tk.Canvas(parent, bg="white", highlightthickness=0)
+        graph_canvas.pack(fill="both", expand=True)
+        
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            cur = conn.cursor()
+            
+            # Get monthly totals for the last 12 months
+            cur.execute('''
+                SELECT month_covered, SUM(amount) as total
+                FROM payments
+                WHERE month_covered IS NOT NULL
+                GROUP BY month_covered
+                ORDER BY month_covered DESC
+                LIMIT 12
+            ''')
+            monthly_data = list(reversed(cur.fetchall()))
+            conn.close()
+            
+            if not monthly_data:
+                graph_canvas.create_text(450, 200, text="No monthly data available",
+                                 font=("Helvetica", 14), fill="#999")
+                return
+            
+            # Calculate dimensions
+            width = 900
+            height = 350
+            margin_left = 80
+            margin_right = 40
+            margin_top = 40
+            margin_bottom = 80
+            graph_width = width - margin_left - margin_right
+            graph_height = height - margin_top - margin_bottom
+            
+            # Find max amount for scaling
+            max_amount = max(d[1] for d in monthly_data)
+            
+            # Draw axes
+            graph_canvas.create_line(margin_left, height - margin_bottom, width - margin_right, height - margin_bottom,
+                             width=2, fill="#2c3e50")  # X-axis
+            graph_canvas.create_line(margin_left, margin_top, margin_left, height - margin_bottom,
+                             width=2, fill="#2c3e50")  # Y-axis
+            
+            # Draw line graph with filled area
+            points = []
+            for i, (month, amount) in enumerate(monthly_data):
+                x = margin_left + (i * graph_width / (len(monthly_data) - 1)) if len(monthly_data) > 1 else margin_left + graph_width / 2
+                y = height - margin_bottom - (amount / max_amount * graph_height) if max_amount > 0 else height - margin_bottom
+                points.append((x, y))
+            
+            # Draw filled area under line
+            if len(points) > 1:
+                area_points = [(points[0][0], height - margin_bottom)] + points + [(points[-1][0], height - margin_bottom)]
+                graph_canvas.create_polygon(area_points, fill="#e3f2fd", outline="")
+                
+                # Draw line
+                for i in range(len(points) - 1):
+                    graph_canvas.create_line(points[i][0], points[i][1], points[i+1][0], points[i+1][1],
+                                     width=3, fill="#1976d2", smooth=True)
+            
+            # Draw points and labels
+            for i, ((month, amount), (x, y)) in enumerate(zip(monthly_data, points)):
+                # Draw point
+                graph_canvas.create_oval(x-6, y-6, x+6, y+6, fill="#1976d2", outline="#0d47a1", width=2)
+                
+                # Amount label
+                graph_canvas.create_text(x, y - 20, text=f"₱{amount:,.0f}",
+                                 font=("Helvetica", 9, "bold"), fill="#1976d2")
+                
+                # Month label
+                month_label = month[5:] if len(month) > 2 else month  # Get MM part
+                graph_canvas.create_text(x, height - margin_bottom + 20,
+                                 text=month_label, font=("Helvetica", 10), fill="#555")
+            
+            # Y-axis labels
+            for i in range(6):
+                y = height - margin_bottom - (i * graph_height / 5)
+                amount = (i * max_amount / 5)
+                graph_canvas.create_text(margin_left - 15, y,
+                                 text=f"₱{amount:,.0f}",
+                                 font=("Helvetica", 9), fill="#555", anchor="e")
+                graph_canvas.create_line(margin_left - 5, y, margin_left, y, fill="#ccc", width=1)
+                # Grid line
+                graph_canvas.create_line(margin_left, y, width - margin_right, y,
+                                 fill="#e0e0e0", width=1, dash=(2, 4))
+            
+            # Labels
+            graph_canvas.create_text(width/2, 15, text="Monthly Revenue Trend (Last 12 Months)",
+                             font=("Helvetica", 12, "bold"), fill="#2c3e50")
+            graph_canvas.create_text(margin_left - 50, height/2, text="Amount (₱)",
+                             font=("Helvetica", 10), fill="#555", angle=90)
+            graph_canvas.create_text(width/2, height - 20, text="Month",
+                             font=("Helvetica", 10), fill="#555")
+            
+        except sqlite3.Error as e:
+            graph_canvas.create_text(450, 200, text=f"Error loading data: {e}",
+                             font=("Helvetica", 12), fill="red")
+    
+    def show_recent_payments(self, parent):
+        """Show recent payments table"""
+        table_frame = tk.Frame(parent, bg="white", relief="solid", bd=1)
+        table_frame.pack(fill="x", pady=(0, 20))
+        
+        tk.Label(table_frame, text="Recent Payments (Last 10)", font=("Helvetica", 14, "bold"),
+                bg="white").pack(pady=15)
+        
+        try:
+            conn = sqlite3.connect(DB_NAME)
+            cur = conn.cursor()
+            
+            cur.execute('''
+                SELECT t.full_name, u.unit_number, p.amount, p.payment_date, p.month_covered
+                FROM payments p
+                JOIN tenants t ON p.tenant_id = t.id
+                LEFT JOIN units u ON t.unit_id = u.id
+                ORDER BY p.payment_date DESC
+                LIMIT 10
+            ''')
+            recent = cur.fetchall()
+            conn.close()
+            
+            if recent:
+                # Create table
+                table = tk.Frame(table_frame, bg="white")
+                table.pack(padx=30, pady=(0, 20))
+                
+                # Headers
+                headers = ["Tenant", "Unit", "Amount", "Date", "Month"]
+                for i, header in enumerate(headers):
+                    tk.Label(table, text=header, font=("Helvetica", 11, "bold"),
+                            bg="#eceff1", width=18, anchor="w", padx=10, pady=8,
+                            relief="solid", bd=1).grid(row=0, column=i, sticky="ew")
+                
+                # Data rows
+                for row_idx, (name, unit, amount, date, month) in enumerate(recent, 1):
+                    bg_color = "#f5f5f5" if row_idx % 2 == 0 else "white"
+                    tk.Label(table, text=name, font=("Helvetica", 10),
+                            bg=bg_color, width=18, anchor="w", padx=10, pady=6,
+                            relief="solid", bd=1).grid(row=row_idx, column=0, sticky="ew")
+                    tk.Label(table, text=unit or "—", font=("Helvetica", 10),
+                            bg=bg_color, width=18, anchor="center", padx=10, pady=6,
+                            relief="solid", bd=1).grid(row=row_idx, column=1, sticky="ew")
+                    tk.Label(table, text=f"₱{amount:,.2f}", font=("Helvetica", 10, "bold"),
+                            bg=bg_color, fg="#2e7d32", width=18, anchor="e", padx=10, pady=6,
+                            relief="solid", bd=1).grid(row=row_idx, column=2, sticky="ew")
+                    tk.Label(table, text=date, font=("Helvetica", 10),
+                            bg=bg_color, width=18, anchor="center", padx=10, pady=6,
+                            relief="solid", bd=1).grid(row=row_idx, column=3, sticky="ew")
+                    tk.Label(table, text=month, font=("Helvetica", 10),
+                            bg=bg_color, width=18, anchor="center", padx=10, pady=6,
+                            relief="solid", bd=1).grid(row=row_idx, column=4, sticky="ew")
+            else:
+                tk.Label(table_frame, text="No recent payments", font=("Helvetica", 12),
+                        bg="white", fg="#999").pack(pady=20)
+                        
+        except sqlite3.Error as e:
+            tk.Label(table_frame, text=f"Error loading recent payments: {e}",
+                    font=("Helvetica", 11), bg="white", fg="red").pack(pady=20)
 
     # ==================== UNITS ====================
     def show_units(self):
