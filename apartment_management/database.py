@@ -82,6 +82,25 @@ def create_database():
         cur.execute('CREATE INDEX IF NOT EXISTS idx_payments_date ON payments(payment_date)')
         cur.execute('CREATE INDEX IF NOT EXISTS idx_payments_month ON payments(month_covered)')
         
+        # ==================== UTILITY BILLS TABLE ====================
+        cur.execute('''
+            CREATE TABLE IF NOT EXISTS utility_bills (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                bill_type TEXT NOT NULL,
+                amount REAL NOT NULL,
+                billing_month TEXT NOT NULL,
+                due_date TEXT,
+                paid INTEGER DEFAULT 0,
+                created_at TEXT,
+                CONSTRAINT chk_bill_type CHECK (bill_type IN ('electric', 'water', 'gas', 'internet'))
+            )
+        ''')
+        print("   ✓ Utility bills table created")
+        
+        # Create indexes for utility bills
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_bills_type ON utility_bills(bill_type)')
+        cur.execute('CREATE INDEX IF NOT EXISTS idx_bills_month ON utility_bills(billing_month)')
+        
         # ==================== TRIGGERS ====================
         print("\n🔄 Creating triggers...")
         
@@ -244,6 +263,43 @@ def insert_sample_data(conn, cur):
         )
         print(f"   ✓ Added {len(payments_data)} payment records")
         
+        # Insert sample utility bills
+        utility_bills_data = [
+            # Electric bills
+            ('electric', 15000.00, '2024-01', '2024-01-20', 1, '2024-01-05'),
+            ('electric', 14500.00, '2024-02', '2024-02-20', 1, '2024-02-05'),
+            ('electric', 16200.00, '2024-03', '2024-03-20', 1, '2024-03-05'),
+            ('electric', 15800.00, '2024-04', '2024-04-20', 1, '2024-04-05'),
+            ('electric', 17000.00, '2024-05', '2024-05-20', 1, '2024-05-05'),
+            ('electric', 16500.00, '2024-06', '2024-06-20', 1, '2024-06-05'),
+            ('electric', 17500.00, '2024-07', '2024-07-20', 1, '2024-07-05'),
+            ('electric', 16800.00, '2024-08', '2024-08-20', 1, '2024-08-05'),
+            ('electric', 15900.00, '2024-09', '2024-09-20', 1, '2024-09-05'),
+            ('electric', 16300.00, '2024-10', '2024-10-20', 1, '2024-10-05'),
+            ('electric', 17200.00, '2024-11', '2024-11-20', 1, '2024-11-05'),
+            ('electric', 15000.00, '2024-12', '2024-12-20', 0, '2024-12-05'),
+            
+            # Water bills
+            ('water', 8500.00, '2024-01', '2024-01-15', 1, '2024-01-05'),
+            ('water', 8200.00, '2024-02', '2024-02-15', 1, '2024-02-05'),
+            ('water', 8800.00, '2024-03', '2024-03-15', 1, '2024-03-05'),
+            ('water', 8600.00, '2024-04', '2024-04-15', 1, '2024-04-05'),
+            ('water', 9000.00, '2024-05', '2024-05-15', 1, '2024-05-05'),
+            ('water', 8700.00, '2024-06', '2024-06-15', 1, '2024-06-05'),
+            ('water', 9200.00, '2024-07', '2024-07-15', 1, '2024-07-05'),
+            ('water', 8900.00, '2024-08', '2024-08-15', 1, '2024-08-05'),
+            ('water', 8400.00, '2024-09', '2024-09-15', 1, '2024-09-05'),
+            ('water', 8600.00, '2024-10', '2024-10-15', 1, '2024-10-05'),
+            ('water', 9100.00, '2024-11', '2024-11-15', 1, '2024-11-05'),
+            ('water', 8500.00, '2024-12', '2024-12-15', 0, '2024-12-05'),
+        ]
+        
+        cur.executemany(
+            'INSERT INTO utility_bills (bill_type, amount, billing_month, due_date, paid, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+            utility_bills_data
+        )
+        print(f"   ✓ Added {len(utility_bills_data)} utility bill records")
+        
         conn.commit()
         print("\n✅ Sample data inserted successfully!")
         
@@ -279,6 +335,13 @@ def display_summary(cur):
         print(f"\n💰 Payments:")
         print(f"   Total Transactions: {total_payments}")
         print(f"   Total Revenue: ₱{total_revenue:,.2f}" if total_revenue else "   Total Revenue: ₱0.00")
+        
+        # Count utility bills
+        cur.execute("SELECT COUNT(*), SUM(amount) FROM utility_bills")
+        total_bills, total_bills_amount = cur.fetchone()
+        print(f"\n⚡ Utility Bills:")
+        print(f"   Total Bills: {total_bills}")
+        print(f"   Total Amount: ₱{total_bills_amount:,.2f}" if total_bills_amount else "   Total Amount: ₱0.00")
         
         # Recent payments
         cur.execute('''
