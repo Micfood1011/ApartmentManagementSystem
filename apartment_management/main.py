@@ -8,6 +8,9 @@ from tkinter import ttk
 import sqlite3
 import os
 
+# Import login page
+from login_page import show_login
+
 # Import page modules
 from pages.home_page import HomePage
 from pages.analytics_page import AnalyticsPage
@@ -160,5 +163,10 @@ if __name__ == "__main__":
     print("\n" + "="*50)
     print("🏢 Vista Verde Apartments RMS")
     print("="*50)
-    app = VistaVerdeApp()
-    app.mainloop()
+    
+    # Show login page first, then show main app on success
+    def start_main_app():
+        app = VistaVerdeApp()
+        app.mainloop()
+    
+    show_login(start_main_app)
