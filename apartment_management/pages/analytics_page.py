@@ -7,6 +7,7 @@ from tkinter import ttk
 import sqlite3
 from datetime import datetime
 
+import os
 DB_NAME = "vista_verde.db"
 
 class AnalyticsPage:
@@ -15,6 +16,7 @@ class AnalyticsPage:
         self.app = app
 
     def show(self):
+
         # Header
         top = tk.Frame(self.parent, bg="#3498db", height=110)
         top.pack(fill="x")
@@ -52,15 +54,30 @@ class AnalyticsPage:
             conn = sqlite3.connect(DB_NAME)
             cur = conn.cursor()
             
+            # Get total tenant payments
             cur.execute("SELECT COALESCE(SUM(amount), 0) FROM payments")
             total_payments = cur.fetchone()[0]
-            electric_bill, water_bill = 15000.00, 8500.00
+            
+            # Get total electric bill from utility_bills table
+            cur.execute("SELECT COALESCE(SUM(electric_bill), 0) FROM payments")
+            electric_bill = cur.fetchone()[0]
+            
+            # Get total water bill from utility_bills table
+            cur.execute("SELECT COALESCE(SUM(water_bill), 0) FROM payments")
+            water_bill = cur.fetchone()[0]
+            
+            # Get payment count
             cur.execute("SELECT COUNT(*) FROM payments")
             payment_count = cur.fetchone()[0]
+            
+            # Get average payment
             cur.execute("SELECT COALESCE(AVG(amount), 0) FROM payments")
             avg_payment = cur.fetchone()[0]
+            
+            # Get expected monthly revenue
             cur.execute("SELECT COALESCE(SUM(monthly_rent), 0) FROM units WHERE is_occupied = 1")
             expected_monthly = cur.fetchone()[0]
+            
             conn.close()
             
             tk.Label(stats_frame, text="Payment Summary Dashboard", font=("Helvetica", 16, "bold"),
